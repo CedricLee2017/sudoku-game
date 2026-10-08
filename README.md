@@ -35,3 +35,8 @@ node --test test-sudoku.js
 - `test-sudoku.js`：Node 內建核心回歸測試。
 - `manus-routes.json`：正式網站頁面路由宣告。
 - `dist/`：靜態發佈內容。
+
+
+## Cloudflare Pages 自動部署
+
+此 repository 的 `main` 分支已連接至 Cloudflare Pages 專案 `sudoku-game-auto`。每次推送至 `main` 都會自動建置並部署；建置命令會確認 `dist/index.html` 存在，並發布 `dist/` 靜態輸出。
