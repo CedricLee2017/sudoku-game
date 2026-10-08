@@ -7,9 +7,11 @@
   const cells = [];
   const MAX_MISTAKES = 3;
   const difficultyLabels = { easy: '簡單', medium: '中等', hard: '困難' };
+  const modeLabels = { standard: '標準數獨', diagonal: '對角線數獨（X-Sudoku）' };
 
   const state = {
     difficulty: 'medium',
+    mode: 'standard',
     puzzle: [],
     solution: [],
     values: [],
@@ -71,9 +73,14 @@
       cell.className = 'cell';
       if (given) cell.classList.add('given');
       if (value && !given) cell.classList.add('filled');
+      const diagonalCell = state.mode === 'diagonal' && (row === col || row + col === 8);
+      if (diagonalCell) cell.classList.add('diagonal-cell');
       const peers = state.highlight && index !== state.selected &&
         (row === selectedRow || col === selectedCol || (boxRow === selectedBoxRow && boxCol === selectedBoxCol));
       if (peers) cell.classList.add('peer');
+      const diagonalPeer = state.highlight && state.mode === 'diagonal' && index !== state.selected &&
+        ((selectedRow === selectedCol && row === col) || (selectedRow + selectedCol === 8 && row + col === 8));
+      if (diagonalPeer) cell.classList.add('diagonal-peer');
       if (state.highlight && selectedValue && value === selectedValue && index !== state.selected) cell.classList.add('same-number');
       if (index === state.selected) cell.classList.add('selected');
       if (wrong && state.checkErrors) cell.classList.add('wrong');
@@ -122,6 +129,9 @@
     $('#notes-state').textContent = state.notesMode ? '開啟' : '關閉';
     $('#error-setting').checked = state.checkErrors;
     $('#highlight-setting').checked = state.highlight;
+    $('#highlight-description').textContent = state.mode === 'diagonal'
+      ? '同行、同列、同宮、對角線與相同數字'
+      : '同行、同列、同宮與相同數字';
     const statusLabel = $('#status-label');
     const liveIndicator = $('.live-indicator');
     if (state.failed) {
@@ -134,7 +144,7 @@
       statusLabel.textContent = '暫停中';
       liveIndicator.style.background = '#d6a85b';
     } else {
-      statusLabel.textContent = `進行中 · ${difficultyLabels[state.difficulty]}`;
+      statusLabel.textContent = `進行中 · ${state.mode === 'diagonal' ? 'X-Sudoku' : '標準'} · ${difficultyLabels[state.difficulty]}`;
       liveIndicator.style.background = '#6b9a72';
     }
   }
@@ -295,11 +305,15 @@
 
   function newGame() {
     state.difficulty = $('#difficulty').value;
+    state.mode = $('#game-mode').value;
+    boardEl.setAttribute('aria-label', state.mode === 'diagonal'
+      ? 'X-Sudoku 9 乘 9 棋盤，兩條大對角線上的數字也不可重複'
+      : '數獨 9 乘 9 棋盤');
     $('#new-game-button').disabled = true;
     $('#new-game-button').innerHTML = '<span aria-hidden="true">…</span> 準備中';
     setMessage('正在準備一盤全新的數獨…');
     window.setTimeout(() => {
-      const generated = generatePuzzle(state.difficulty);
+      const generated = generatePuzzle(state.difficulty, state.mode);
       state.puzzle = generated.puzzle.flat();
       state.solution = generated.solution.flat();
       state.values = state.puzzle.slice();
@@ -314,7 +328,7 @@
       state.history = [];
       state.selected = state.puzzle.findIndex((value) => value === 0);
       const clueText = generated.clueCount;
-      setMessage(`${difficultyLabels[state.difficulty]}難度已就緒 · ${clueText} 個提示數字。`);
+      setMessage(`${modeLabels[state.mode]} · ${difficultyLabels[state.difficulty]}難度已就緒 · ${clueText} 個提示數字。`);
       updateTimer();
       renderBoard();
       $('#new-game-button').disabled = false;
@@ -360,6 +374,7 @@
   $('#restart-button').addEventListener('click', restartGame);
   $('#new-game-button').addEventListener('click', newGame);
   $('#difficulty').addEventListener('change', newGame);
+  $('#game-mode').addEventListener('change', newGame);
   $('#pause-button').addEventListener('click', togglePause);
   $('#error-setting').addEventListener('change', (event) => {
     state.checkErrors = event.target.checked;

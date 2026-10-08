@@ -3,6 +3,16 @@
 
   const SIZE = 9;
   const BOX = 3;
+  const FULL_MASK = (1 << SIZE) - 1;
+  const MAX_SEARCH_NODES = 250000;
+
+  function normalizeMode(mode) {
+    return mode === 'diagonal' || mode === 'x-sudoku' ? 'diagonal' : 'standard';
+  }
+
+  function isDiagonalMode(mode) {
+    return normalizeMode(mode) === 'diagonal';
+  }
 
   function shuffle(items) {
     const result = items.slice();
@@ -19,7 +29,7 @@
     );
   }
 
-  function createSolvedGrid() {
+  function createStandardSolvedGrid() {
     const rows = randomizedGroups();
     const cols = randomizedGroups();
     const digits = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
@@ -28,26 +38,185 @@
     );
   }
 
-  function countSolutions(input, limit = 2, nodeLimit = 100000) {
-    const board = input.flat();
+  function boxIndex(row, col) {
+    return Math.floor(row / BOX) * BOX + Math.floor(col / BOX);
+  }
+
+  function candidatesFor(row, col, rowMask, colMask, boxMask, mainDiagonalMask, antiDiagonalMask, diagonal) {
+    let used = rowMask[row] | colMask[col] | boxMask[boxIndex(row, col)];
+    if (diagonal && row === col) used |= mainDiagonalMask;
+    if (diagonal && row + col === SIZE - 1) used |= antiDiagonalMask;
+    return FULL_MASK & ~used;
+  }
+
+  function createDiagonalSolvedGrid() {
+    const board = Array(SIZE * SIZE).fill(0);
     const rowMask = Array(SIZE).fill(0);
     const colMask = Array(SIZE).fill(0);
     const boxMask = Array(SIZE).fill(0);
-    const fullMask = (1 << SIZE) - 1;
+    let mainDiagonalMask = 0;
+    let antiDiagonalMask = 0;
+    let nodes = 0;
+
+    function search() {
+      nodes += 1;
+      if (nodes > MAX_SEARCH_NODES) return false;
+
+      let bestIndex = -1;
+      let bestCandidates = 0;
+      let bestCount = SIZE + 1;
+      const start = Math.floor(Math.random() * board.length);
+
+      for (let offset = 0; offset < board.length; offset += 1) {
+        const index = (start + offset) % board.length;
+        if (board[index] !== 0) continue;
+        const row = Math.floor(index / SIZE);
+        const col = index % SIZE;
+        const candidates = candidatesFor(row, col, rowMask, colMask, boxMask, mainDiagonalMask, antiDiagonalMask, true);
+        const count = bitCount(candidates);
+        if (count === 0) return false;
+        if (count < bestCount) {
+          bestIndex = index;
+          bestCandidates = candidates;
+          bestCount = count;
+          if (count === 1) break;
+        }
+      }
+
+      if (bestIndex === -1) return true;
+
+      const row = Math.floor(bestIndex / SIZE);
+      const col = bestIndex % SIZE;
+      const box = boxIndex(row, col);
+      const choices = [];
+      for (let bit = 1; bit <= FULL_MASK; bit <<= 1) {
+        if (bestCandidates & bit) choices.push(bitToDigit(bit));
+      }
+
+      for (const digit of shuffle(choices)) {
+        const bit = 1 << (digit - 1);
+        board[bestIndex] = digit;
+        rowMask[row] |= bit;
+        colMask[col] |= bit;
+        boxMask[box] |= bit;
+        if (row === col) mainDiagonalMask |= bit;
+        if (row + col === SIZE - 1) antiDiagonalMask |= bit;
+
+        if (search()) return true;
+
+        board[bestIndex] = 0;
+        rowMask[row] &= ~bit;
+        colMask[col] &= ~bit;
+        boxMask[box] &= ~bit;
+        if (row === col) mainDiagonalMask &= ~bit;
+        if (row + col === SIZE - 1) antiDiagonalMask &= ~bit;
+      }
+      return false;
+    }
+
+    if (!search()) {
+      // Restart once with fresh randomized branching if a rare hard branch hits its node limit.
+      return createDiagonalSolvedGridRetry();
+    }
+    return Array.from({ length: SIZE }, (_, row) => board.slice(row * SIZE, (row + 1) * SIZE));
+  }
+
+  function createDiagonalSolvedGridRetry() {
+    const board = Array(SIZE * SIZE).fill(0);
+    const rowMask = Array(SIZE).fill(0);
+    const colMask = Array(SIZE).fill(0);
+    const boxMask = Array(SIZE).fill(0);
+    let mainDiagonalMask = 0;
+    let antiDiagonalMask = 0;
+    let nodes = 0;
+
+    function search() {
+      nodes += 1;
+      if (nodes > MAX_SEARCH_NODES) return false;
+      let bestIndex = -1;
+      let bestMask = 0;
+      let bestCount = SIZE + 1;
+      const start = Math.floor(Math.random() * board.length);
+      for (let offset = 0; offset < board.length; offset += 1) {
+        const index = (start + offset) % board.length;
+        if (board[index]) continue;
+        const row = Math.floor(index / SIZE);
+        const col = index % SIZE;
+        const mask = candidatesFor(row, col, rowMask, colMask, boxMask, mainDiagonalMask, antiDiagonalMask, true);
+        const count = bitCount(mask);
+        if (!count) return false;
+        if (count < bestCount) {
+          bestIndex = index;
+          bestMask = mask;
+          bestCount = count;
+          if (count === 1) break;
+        }
+      }
+      if (bestIndex < 0) return true;
+      const row = Math.floor(bestIndex / SIZE);
+      const col = bestIndex % SIZE;
+      const box = boxIndex(row, col);
+      const choices = [];
+      for (let bit = 1; bit <= FULL_MASK; bit <<= 1) if (bestMask & bit) choices.push(bitToDigit(bit));
+      for (const digit of shuffle(choices)) {
+        const bit = 1 << (digit - 1);
+        board[bestIndex] = digit;
+        rowMask[row] |= bit;
+        colMask[col] |= bit;
+        boxMask[box] |= bit;
+        if (row === col) mainDiagonalMask |= bit;
+        if (row + col === SIZE - 1) antiDiagonalMask |= bit;
+        if (search()) return true;
+        board[bestIndex] = 0;
+        rowMask[row] &= ~bit;
+        colMask[col] &= ~bit;
+        boxMask[box] &= ~bit;
+        if (row === col) mainDiagonalMask &= ~bit;
+        if (row + col === SIZE - 1) antiDiagonalMask &= ~bit;
+      }
+      return false;
+    }
+
+    if (!search()) throw new Error('Unable to generate a valid X-Sudoku grid within the search limit.');
+    return Array.from({ length: SIZE }, (_, row) => board.slice(row * SIZE, (row + 1) * SIZE));
+  }
+
+  function createSolvedGrid(mode = 'standard') {
+    return isDiagonalMode(mode) ? createDiagonalSolvedGrid() : createStandardSolvedGrid();
+  }
+
+  function countSolutions(input, limit = 2, mode = 'standard', nodeLimit = MAX_SEARCH_NODES) {
+    if (typeof mode === 'number') {
+      nodeLimit = mode;
+      mode = 'standard';
+    }
+    const diagonal = isDiagonalMode(mode);
+    const board = input.flat();
+    if (board.length !== SIZE * SIZE) return 0;
+
+    const rowMask = Array(SIZE).fill(0);
+    const colMask = Array(SIZE).fill(0);
+    const boxMask = Array(SIZE).fill(0);
+    let mainDiagonalMask = 0;
+    let antiDiagonalMask = 0;
     let solutions = 0;
     let nodes = 0;
 
-    const boxIndex = (row, col) => Math.floor(row / BOX) * BOX + Math.floor(col / BOX);
     for (let row = 0; row < SIZE; row += 1) {
       for (let col = 0; col < SIZE; col += 1) {
         const value = board[row * SIZE + col];
+        if (!Number.isInteger(value) || value < 0 || value > SIZE) return 0;
         if (!value) continue;
         const bit = 1 << (value - 1);
         const box = boxIndex(row, col);
         if ((rowMask[row] & bit) || (colMask[col] & bit) || (boxMask[box] & bit)) return 0;
+        if (diagonal && row === col && (mainDiagonalMask & bit)) return 0;
+        if (diagonal && row + col === SIZE - 1 && (antiDiagonalMask & bit)) return 0;
         rowMask[row] |= bit;
         colMask[col] |= bit;
         boxMask[box] |= bit;
+        if (diagonal && row === col) mainDiagonalMask |= bit;
+        if (diagonal && row + col === SIZE - 1) antiDiagonalMask |= bit;
       }
     }
 
@@ -57,13 +226,14 @@
       let bestIndex = -1;
       let bestCandidates = 0;
       let bestCount = SIZE + 1;
+      const start = Math.floor(Math.random() * board.length);
 
-      for (let index = 0; index < board.length; index += 1) {
+      for (let offset = 0; offset < board.length; offset += 1) {
+        const index = (start + offset) % board.length;
         if (board[index] !== 0) continue;
         const row = Math.floor(index / SIZE);
         const col = index % SIZE;
-        const box = boxIndex(row, col);
-        const candidates = fullMask & ~(rowMask[row] | colMask[col] | boxMask[box]);
+        const candidates = candidatesFor(row, col, rowMask, colMask, boxMask, mainDiagonalMask, antiDiagonalMask, diagonal);
         const count = bitCount(candidates);
         if (count === 0) return;
         if (count < bestCount) {
@@ -82,23 +252,29 @@
       const row = Math.floor(bestIndex / SIZE);
       const col = bestIndex % SIZE;
       const box = boxIndex(row, col);
-      for (let bit = 1; bit <= fullMask; bit <<= 1) {
-        if (!(bestCandidates & bit)) continue;
-        board[bestIndex] = bitToDigit(bit);
+      const choices = [];
+      for (let bit = 1; bit <= FULL_MASK; bit <<= 1) if (bestCandidates & bit) choices.push(bitToDigit(bit));
+      for (const digit of shuffle(choices)) {
+        const bit = 1 << (digit - 1);
+        board[bestIndex] = digit;
         rowMask[row] |= bit;
         colMask[col] |= bit;
         boxMask[box] |= bit;
+        if (diagonal && row === col) mainDiagonalMask |= bit;
+        if (diagonal && row + col === SIZE - 1) antiDiagonalMask |= bit;
         search();
         board[bestIndex] = 0;
-        rowMask[row] ^= bit;
-        colMask[col] ^= bit;
-        boxMask[box] ^= bit;
+        rowMask[row] &= ~bit;
+        colMask[col] &= ~bit;
+        boxMask[box] &= ~bit;
+        if (diagonal && row === col) mainDiagonalMask &= ~bit;
+        if (diagonal && row + col === SIZE - 1) antiDiagonalMask &= ~bit;
         if (solutions >= limit || nodes >= nodeLimit) return;
       }
     }
 
     search();
-    // 若搜尋超出節點上限，保守地不把候選題目視為唯一解。
+    // If the search limit is reached before ruling out a second solution, fail closed.
     if (nodes >= nodeLimit && solutions < limit) return limit;
     return solutions;
   }
@@ -121,10 +297,11 @@
     return digit;
   }
 
-  function generatePuzzle(difficulty = 'medium') {
+  function generatePuzzle(difficulty = 'medium', mode = 'standard') {
     const targets = { easy: 40, medium: 34, hard: 29 };
     const targetClues = targets[difficulty] || targets.medium;
-    const solution = createSolvedGrid();
+    const normalizedMode = normalizeMode(mode);
+    const solution = createSolvedGrid(normalizedMode);
     const puzzle = solution.map((row) => row.slice());
     const positions = shuffle(Array.from({ length: SIZE * SIZE }, (_, index) => index));
     let clues = SIZE * SIZE;
@@ -135,17 +312,17 @@
       const col = position % SIZE;
       const value = puzzle[row][col];
       puzzle[row][col] = 0;
-      if (countSolutions(puzzle, 2) === 1) {
+      if (countSolutions(puzzle, 2, normalizedMode) === 1) {
         clues -= 1;
       } else {
         puzzle[row][col] = value;
       }
     }
 
-    return { puzzle, solution, clueCount: clues };
+    return { puzzle, solution, clueCount: clues, mode: normalizedMode };
   }
 
-  const api = { countSolutions, generatePuzzle, createSolvedGrid };
+  const api = { countSolutions, generatePuzzle, createSolvedGrid, isDiagonalMode, normalizeMode };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.SudokuEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);
