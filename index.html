@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f6ef">
+  <meta name="description" content="一款安靜、清爽的響應式數獨遊戲。">
+  <title>九格日常 — 數獨 Sudoku</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="sudoku.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="九格日常首頁">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="brand-copy"><strong>九格日常</strong><small>一段安靜的邏輯練習</small></span>
+      </a>
+      <button class="icon-button help-button" id="help-button" type="button" aria-label="查看遊戲說明" title="遊戲說明">?</button>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div class="eyebrow"><span class="eyebrow-dot"></span> DAILY PUZZLE · NO. 09</div>
+        <h1 id="page-title">把九宮格，<span>一格一格解開。</span></h1>
+        <p>先記下可能，再決定答案。今天，留一點時間給自己。</p>
+      </section>
+
+      <section class="game-layout" aria-label="數獨遊戲">
+        <div class="board-column">
+          <div class="board-heading">
+            <div class="difficulty-control">
+              <label for="difficulty">今日練習</label>
+              <select id="difficulty" aria-label="選擇數獨難度">
+                <option value="easy">簡單</option>
+                <option value="medium" selected>中等</option>
+                <option value="hard">困難</option>
+              </select>
+            </div>
+            <div class="board-heading-actions">
+              <button id="restart-button" class="text-button" type="button" title="重新開始目前題目">重新開始</button>
+              <button id="new-game-button" class="primary-button" type="button"><span aria-hidden="true">＋</span> 新局</button>
+            </div>
+          </div>
+
+          <div class="board-wrap">
+            <div id="board" class="sudoku-board" role="grid" aria-label="數獨 9 乘 9 棋盤"></div>
+            <div id="pause-overlay" class="pause-overlay" hidden>
+              <span class="pause-symbol" aria-hidden="true">Ⅱ</span>
+              <strong>先歇一會兒</strong>
+              <span>按「繼續」回到棋盤</span>
+            </div>
+          </div>
+          <div id="game-message" class="game-message" role="status" aria-live="polite"></div>
+
+          <div class="number-pad" aria-label="數字輸入">
+            <div class="number-keys">
+              <button type="button" data-number="1" aria-label="輸入 1">1</button>
+              <button type="button" data-number="2" aria-label="輸入 2">2</button>
+              <button type="button" data-number="3" aria-label="輸入 3">3</button>
+              <button type="button" data-number="4" aria-label="輸入 4">4</button>
+              <button type="button" data-number="5" aria-label="輸入 5">5</button>
+              <button type="button" data-number="6" aria-label="輸入 6">6</button>
+              <button type="button" data-number="7" aria-label="輸入 7">7</button>
+              <button type="button" data-number="8" aria-label="輸入 8">8</button>
+              <button type="button" data-number="9" aria-label="輸入 9">9</button>
+            </div>
+            <button id="erase-button" class="erase-button" type="button" aria-label="清除所選格子" title="清除">⌫</button>
+          </div>
+          <p class="keyboard-tip">鍵盤 <kbd>1–9</kbd> 輸入 <span>·</span> <kbd>← ↑ → ↓</kbd> 移動 <span>·</span> <kbd>N</kbd> 筆記</p>
+        </div>
+
+        <aside class="side-panel" aria-label="遊戲控制與狀態">
+          <section class="stats-card" aria-label="遊戲狀態">
+            <div class="stats-topline"><span class="live-indicator"></span><span id="status-label">進行中</span><button id="pause-button" class="pause-button" type="button">暫停</button></div>
+            <div class="timer-block"><span class="stat-label">已用時間</span><strong id="timer" aria-live="off">00:00</strong></div>
+            <div class="stats-divider"></div>
+            <div class="mistakes-row"><div><span class="stat-label">錯誤次數</span><strong id="mistakes-count">0 <small>/ 3</small></strong></div><div class="mistake-dots" id="mistake-dots" aria-hidden="true"><i></i><i></i><i></i></div></div>
+          </section>
+
+          <section class="tools-card" aria-labelledby="tools-title">
+            <div class="card-heading"><span class="section-icon" aria-hidden="true">✳</span><div><h2 id="tools-title">解題工具</h2><p>按一下，專注在下一步</p></div></div>
+            <button id="notes-button" class="tool-row" type="button" aria-pressed="false"><span class="tool-icon note-icon" aria-hidden="true">✎</span><span class="tool-text"><strong>筆記模式</strong><small>記下候選數字</small></span><span class="tool-state" id="notes-state">關閉</span></button>
+            <button id="hint-button" class="tool-row" type="button"><span class="tool-icon hint-icon" aria-hidden="true">✦</span><span class="tool-text"><strong>提示一格</strong><small>揭示一個正確數字</small></span><span class="row-chevron" aria-hidden="true">↗</span></button>
+            <button id="undo-button" class="tool-row" type="button" disabled><span class="tool-icon undo-icon" aria-hidden="true">↶</span><span class="tool-text"><strong>撤銷上一步</strong><small>回到剛才的狀態</small></span><span class="row-chevron" aria-hidden="true">↗</span></button>
+          </section>
+
+          <section class="settings-card" aria-labelledby="settings-title">
+            <div class="card-heading compact-heading"><span class="section-icon settings-icon" aria-hidden="true">⚙</span><div><h2 id="settings-title">遊戲設定</h2></div></div>
+            <label class="setting-row"><span><strong>錯誤提示</strong><small>即時標示不正確的數字</small></span><input id="error-setting" class="switch" type="checkbox" checked><span class="switch-ui" aria-hidden="true"></span></label>
+            <label class="setting-row"><span><strong>格子高亮</strong><small>提示同行、同列與相同數字</small></span><input id="highlight-setting" class="switch" type="checkbox" checked><span class="switch-ui" aria-hidden="true"></span></label>
+          </section>
+
+          <div class="quote-card"><span aria-hidden="true">“</span><p>每一步，都讓答案更清晰。</p><small>專注當下 · 九格日常</small></div>
+        </aside>
+      </section>
+      <footer class="page-footer"><span>九格日常</span><span>一場和自己相處的練習</span><span class="footer-mark" aria-hidden="true">9 × 9</span></footer>
+    </main>
+  </div>
+
+  <div id="help-dialog" class="dialog-backdrop" hidden>
+    <section class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <button id="close-help-button" class="dialog-close" type="button" aria-label="關閉說明">×</button>
+      <div class="dialog-eyebrow">HOW TO PLAY</div>
+      <h2 id="help-title">給自己一點<br>思考的空間。</h2>
+      <p>在空格填入數字 1 到 9，讓每一列、每一行，以及每個 3×3 宮格，都恰好包含一次 1 到 9。</p>
+      <p>還不確定時，打開「筆記模式」記下候選數字。選取格子後按「提示一格」，或用撤銷回到上一步。</p>
+      <button id="got-it-button" class="primary-button dialog-ok" type="button">知道了</button>
+    </section>
+  </div>
+</body>
+</html>
