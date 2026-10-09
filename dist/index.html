@@ -45,6 +45,7 @@
                 <select id="game-mode" aria-label="選擇遊戲模式">
                   <option value="standard" selected>標準數獨</option>
                   <option value="diagonal">對角線數獨（X-Sudoku）</option>
+                  <option value="jigsaw">鋸齒數獨（Jigsaw Sudoku）</option>
                 </select>
               </div>
             </div>
@@ -114,8 +115,9 @@
       <button id="close-help-button" class="dialog-close" type="button" aria-label="關閉說明">×</button>
       <div class="dialog-eyebrow">HOW TO PLAY</div>
       <h2 id="help-title">給自己一點<br>思考的空間。</h2>
-      <p>在空格填入數字 1 到 9，讓每一列、每一行，以及每個 3×3 宮格，都恰好包含一次 1 到 9。</p>
+      <p>在空格填入數字 1 到 9，讓每一行、每一列，以及各模式要求的區域，都恰好包含一次 1 到 9。</p>
       <p>選擇「對角線數獨（X-Sudoku）」時，左上到右下與右上到左下兩條大對角線也必須各自包含 1 到 9，且不能重複。</p>
+      <p>選擇「鋸齒數獨（Jigsaw Sudoku）」時，3×3 宮格規則改為 9 個連通的異形區域；每區各含 9 格，且數字 1 到 9 不重複。</p>
       <p>還不確定時，打開「筆記模式」記下候選數字。選取格子後按「提示一格」，或用撤銷回到上一步。</p>
       <button id="got-it-button" class="primary-button dialog-ok" type="button">知道了</button>
     </section>

@@ -8,6 +8,7 @@
   --muted: #8a958c;
   --line: #e5e9e0;
   --line-strong: #aebcb0;
+  --jigsaw-edge: #80917e;
   --green: #315d47;
   --green-dark: #254a38;
   --green-soft: #e9f1e8;
@@ -69,11 +70,16 @@ h1 span { color: var(--green); }
 .cell:nth-child(n+73) { border-bottom: 0; }
 .cell:nth-child(3n):not(:nth-child(9n)) { border-right: 1.5px solid var(--line-strong); }
 .cell:nth-child(n+19):nth-child(-n+27), .cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 1.5px solid var(--line-strong); }
+.sudoku-board.jigsaw-mode .cell:nth-child(3n):not(:nth-child(9n)):not(.region-right) { border-right: 1px solid #dce4db; }
+.sudoku-board.jigsaw-mode .cell:nth-child(n+19):nth-child(-n+27):not(.region-bottom), .sudoku-board.jigsaw-mode .cell:nth-child(n+46):nth-child(-n+54):not(.region-bottom) { border-bottom: 1px solid #dce4db; }
+.sudoku-board.jigsaw-mode .cell.region-right { border-right: 2px solid var(--jigsaw-edge); }
+.sudoku-board.jigsaw-mode .cell.region-bottom { border-bottom: 2px solid var(--jigsaw-edge); }
 .cell.given { color: #304238; font-weight: 700; }
 .cell.diagonal-cell { background: #f8f4e8; }
 .cell.peer { background: var(--green-tint); }
 .cell.diagonal-peer { background: #e6eee0; }
 .cell.diagonal-cell.diagonal-peer { background: #e6eee0; }
+.cell.region-peer { background: #e6eee0; }
 .cell.same-number { background: #e1ecdd; color: #1e5638; }
 .cell.selected { z-index: 1; background: #d4e5d2; box-shadow: inset 0 0 0 2px #66866e; }
 .cell.wrong { background: var(--coral-soft); color: var(--coral); }

@@ -7,13 +7,14 @@
   const cells = [];
   const MAX_MISTAKES = 3;
   const difficultyLabels = { easy: '簡單', medium: '中等', hard: '困難' };
-  const modeLabels = { standard: '標準數獨', diagonal: '對角線數獨（X-Sudoku）' };
+  const modeLabels = { standard: '標準數獨', diagonal: '對角線數獨（X-Sudoku）', jigsaw: '鋸齒數獨（Jigsaw Sudoku）' };
 
   const state = {
     difficulty: 'medium',
     mode: 'standard',
     puzzle: [],
     solution: [],
+    regions: null,
     values: [],
     notes: [],
     selected: 40,
@@ -61,6 +62,8 @@
     const selectedCol = state.selected % 9;
     const selectedBoxRow = Math.floor(selectedRow / 3);
     const selectedBoxCol = Math.floor(selectedCol / 3);
+    const selectedRegion = state.regions ? state.regions[state.selected] : -1;
+    boardEl.classList.toggle('jigsaw-mode', state.mode === 'jigsaw');
 
     cells.forEach((cell, index) => {
       const row = Math.floor(index / 9);
@@ -75,9 +78,17 @@
       if (value && !given) cell.classList.add('filled');
       const diagonalCell = state.mode === 'diagonal' && (row === col || row + col === 8);
       if (diagonalCell) cell.classList.add('diagonal-cell');
+      if (state.mode === 'jigsaw' && state.regions) {
+        cell.classList.add('jigsaw-cell');
+        if (col < 8 && state.regions[index] !== state.regions[index + 1]) cell.classList.add('region-right');
+        if (row < 8 && state.regions[index] !== state.regions[index + 9]) cell.classList.add('region-bottom');
+      }
+      const regionPeer = state.mode === 'jigsaw' && state.regions && state.regions[index] === selectedRegion;
+      const boxPeer = state.mode !== 'jigsaw' && boxRow === selectedBoxRow && boxCol === selectedBoxCol;
       const peers = state.highlight && index !== state.selected &&
-        (row === selectedRow || col === selectedCol || (boxRow === selectedBoxRow && boxCol === selectedBoxCol));
+        (row === selectedRow || col === selectedCol || boxPeer || regionPeer);
       if (peers) cell.classList.add('peer');
+      if (state.highlight && index !== state.selected && regionPeer) cell.classList.add('region-peer');
       const diagonalPeer = state.highlight && state.mode === 'diagonal' && index !== state.selected &&
         ((selectedRow === selectedCol && row === col) || (selectedRow + selectedCol === 8 && row + col === 8));
       if (diagonalPeer) cell.classList.add('diagonal-peer');
@@ -131,7 +142,9 @@
     $('#highlight-setting').checked = state.highlight;
     $('#highlight-description').textContent = state.mode === 'diagonal'
       ? '同行、同列、同宮、對角線與相同數字'
-      : '同行、同列、同宮與相同數字';
+      : state.mode === 'jigsaw'
+        ? '同行、同列、異形區域與相同數字'
+        : '同行、同列、同宮與相同數字';
     const statusLabel = $('#status-label');
     const liveIndicator = $('.live-indicator');
     if (state.failed) {
@@ -144,7 +157,8 @@
       statusLabel.textContent = '暫停中';
       liveIndicator.style.background = '#d6a85b';
     } else {
-      statusLabel.textContent = `進行中 · ${state.mode === 'diagonal' ? 'X-Sudoku' : '標準'} · ${difficultyLabels[state.difficulty]}`;
+      const shortMode = state.mode === 'diagonal' ? 'X-Sudoku' : state.mode === 'jigsaw' ? 'Jigsaw' : '標準';
+      statusLabel.textContent = `進行中 · ${shortMode} · ${difficultyLabels[state.difficulty]}`;
       liveIndicator.style.background = '#6b9a72';
     }
   }
@@ -308,7 +322,9 @@
     state.mode = $('#game-mode').value;
     boardEl.setAttribute('aria-label', state.mode === 'diagonal'
       ? 'X-Sudoku 9 乘 9 棋盤，兩條大對角線上的數字也不可重複'
-      : '數獨 9 乘 9 棋盤');
+      : state.mode === 'jigsaw'
+        ? '鋸齒數獨 9 乘 9 棋盤，含 9 個各有 9 格的連通異形區域'
+        : '數獨 9 乘 9 棋盤');
     $('#new-game-button').disabled = true;
     $('#new-game-button').innerHTML = '<span aria-hidden="true">…</span> 準備中';
     setMessage('正在準備一盤全新的數獨…');
@@ -316,6 +332,7 @@
       const generated = generatePuzzle(state.difficulty, state.mode);
       state.puzzle = generated.puzzle.flat();
       state.solution = generated.solution.flat();
+      state.regions = generated.regions || null;
       state.values = state.puzzle.slice();
       state.notes = Array.from({ length: 81 }, () => new Set());
       state.errors = 0;
