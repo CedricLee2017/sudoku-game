@@ -9,6 +9,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script defer src="sudoku.js"></script>
+  <script defer src="achievements.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -18,12 +19,17 @@
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
         <span class="brand-copy"><strong>九格日常</strong><small>一段安靜的邏輯練習</small></span>
       </a>
-      <button class="icon-button help-button" id="help-button" type="button" aria-label="查看遊戲說明" title="遊戲說明">?</button>
+      <div class="topbar-actions">
+        <button class="achievement-button" id="achievements-button" type="button" aria-haspopup="dialog" aria-controls="achievements-dialog" aria-label="成就與徽章">
+          <span class="achievement-button-icon" aria-hidden="true">✦</span><span>成就</span><small id="achievement-count">0/7</small>
+        </button>
+        <button class="icon-button help-button" id="help-button" type="button" aria-label="查看遊戲說明" title="遊戲說明">?</button>
+      </div>
     </header>
 
     <main>
       <section class="intro" aria-labelledby="page-title">
-        <div class="eyebrow"><span class="eyebrow-dot"></span> DAILY PUZZLE · NO. 09</div>
+        <div class="eyebrow"><span class="eyebrow-dot"></span><span id="puzzle-eyebrow">DAILY PUZZLE · NO. 09</span></div>
         <h1 id="page-title">把九宮格，<span>一格一格解開。</span></h1>
         <p>先記下可能，再決定答案。今天，留一點時間給自己。</p>
       </section>
@@ -50,6 +56,7 @@
               </div>
             </div>
             <div class="board-heading-actions">
+              <button id="daily-button" class="text-button daily-button" type="button" title="開始今日的每日一題">每日一題</button>
               <button id="restart-button" class="text-button" type="button" title="重新開始目前題目">重新開始</button>
               <button id="new-game-button" class="primary-button" type="button"><span aria-hidden="true">＋</span> 新局</button>
             </div>
@@ -121,6 +128,24 @@
       <p>還不確定時，打開「筆記模式」記下候選數字。選取格子後按「提示一格」，或用撤銷回到上一步。</p>
       <button id="got-it-button" class="primary-button dialog-ok" type="button">知道了</button>
     </section>
+  </div>
+
+  <div id="achievements-dialog" class="dialog-backdrop" hidden>
+    <section class="help-dialog achievements-dialog" role="dialog" aria-modal="true" aria-labelledby="achievements-title">
+      <button id="close-achievements-button" class="dialog-close" type="button" aria-label="關閉成就">×</button>
+      <div class="dialog-eyebrow">BADGES &amp; ACHIEVEMENTS</div>
+      <h2 id="achievements-title">每一盤，<br>都留下成就。</h2>
+      <p id="achievement-summary">已解鎖 0 / 7 枚徽章。繼續解題，收藏你的每一步。</p>
+      <div id="achievement-list" class="achievement-list" aria-label="成就徽章清單"></div>
+      <button id="close-achievements-done" class="primary-button dialog-ok" type="button">繼續解題</button>
+    </section>
+  </div>
+
+  <div class="achievement-toast-stack" aria-live="polite" aria-atomic="true">
+    <div id="achievement-toast" class="achievement-toast" role="status" hidden>
+      <span class="achievement-toast-symbol" aria-hidden="true">🎉</span>
+      <span class="achievement-toast-copy"><small>BADGE UNLOCKED</small><strong id="achievement-toast-title"></strong></span>
+    </div>
   </div>
 </body>
 </html>

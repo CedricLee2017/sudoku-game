@@ -2,12 +2,17 @@
   'use strict';
 
   const { generatePuzzle } = window.SudokuEngine;
+  const Achievements = window.SudokuAchievements;
   const $ = (selector) => document.querySelector(selector);
   const boardEl = $('#board');
   const cells = [];
   const MAX_MISTAKES = 3;
+  const DAILY_CHALLENGE_KEY = 'jiuge-daily-puzzle-v1';
   const difficultyLabels = { easy: '簡單', medium: '中等', hard: '困難' };
   const modeLabels = { standard: '標準數獨', diagonal: '對角線數獨（X-Sudoku）', jigsaw: '鋸齒數獨（Jigsaw Sudoku）' };
+  const achievementToastQueue = [];
+  let achievementProgress = Achievements.loadProgress();
+  let achievementToastTimer = null;
 
   const state = {
     difficulty: 'medium',
@@ -27,6 +32,9 @@
     paused: false,
     failed: false,
     completed: false,
+    usedHint: false,
+    isDaily: false,
+    dailyDate: null,
     history: []
   };
 
@@ -158,7 +166,9 @@
       liveIndicator.style.background = '#d6a85b';
     } else {
       const shortMode = state.mode === 'diagonal' ? 'X-Sudoku' : state.mode === 'jigsaw' ? 'Jigsaw' : '標準';
-      statusLabel.textContent = `進行中 · ${shortMode} · ${difficultyLabels[state.difficulty]}`;
+      statusLabel.textContent = state.isDaily
+        ? `每日一題 · ${state.dailyDate}`
+        : `進行中 · ${shortMode} · ${difficultyLabels[state.difficulty]}`;
       liveIndicator.style.background = '#6b9a72';
     }
   }
@@ -187,13 +197,25 @@
   }
 
   function maybeFinish() {
-    if (state.values.some((value, index) => value !== state.solution[index])) return;
+    if (state.completed || state.values.some((value, index) => value !== state.solution[index])) return;
     const finalElapsed = elapsedNow();
     state.completed = true;
     state.elapsedSeconds = finalElapsed;
     const minutes = String(Math.floor(state.elapsedSeconds / 60)).padStart(2, '0');
     const seconds = String(state.elapsedSeconds % 60).padStart(2, '0');
     setMessage(`完成了！這次花了 ${minutes}:${seconds}。好好享受這一刻。`, 'success');
+    const completedToday = state.isDaily && state.dailyDate === Achievements.localDateKey();
+    const result = Achievements.recordCompletion(achievementProgress, {
+      mode: state.mode,
+      difficulty: state.difficulty,
+      elapsedSeconds: finalElapsed,
+      usedHint: state.usedHint,
+      isDaily: completedToday,
+      dailyDate: completedToday ? state.dailyDate : null
+    });
+    achievementProgress = result.progress;
+    refreshAchievementUi();
+    queueAchievementToasts(result.newlyUnlocked);
   }
 
   function enterNumber(number) {
@@ -286,6 +308,7 @@
     if (target < 0) target = state.values.findIndex((value, index) => indexIsEditable(index) && value !== state.solution[index]);
     if (target < 0) return;
     saveHistory();
+    state.usedHint = true;
     state.selected = target;
     state.values[target] = state.solution[target];
     state.notes[target].clear();
@@ -309,6 +332,7 @@
     state.paused = false;
     state.failed = false;
     state.completed = false;
+    state.usedHint = false;
     state.notesMode = false;
     state.history = [];
     state.selected = state.puzzle.findIndex((value) => value === 0);
@@ -317,19 +341,77 @@
     renderBoard();
   }
 
-  function newGame() {
+  function isPuzzleGrid(grid, allowEmpty) {
+    return Array.isArray(grid) && grid.length === 9 && grid.every((row) =>
+      Array.isArray(row) && row.length === 9 && row.every((value) =>
+        Number.isInteger(value) && value >= (allowEmpty ? 0 : 1) && value <= 9
+      )
+    );
+  }
+
+  function dailyPuzzleFor(dateKey) {
+    try {
+      const cached = JSON.parse(window.localStorage.getItem(DAILY_CHALLENGE_KEY) || 'null');
+      if (cached && cached.dateKey === dateKey && isPuzzleGrid(cached.puzzle, true) && isPuzzleGrid(cached.solution, false)) {
+        return { puzzle: cached.puzzle, solution: cached.solution, clueCount: cached.clueCount };
+      }
+    } catch (_error) {
+      // A private browsing or unavailable LocalStorage session can still play a fresh daily puzzle.
+    }
+
+    const generated = generatePuzzle('medium', 'standard');
+    try {
+      window.localStorage.setItem(DAILY_CHALLENGE_KEY, JSON.stringify({
+        dateKey,
+        puzzle: generated.puzzle,
+        solution: generated.solution,
+        clueCount: generated.clueCount
+      }));
+    } catch (_error) {
+      // Keep the generated puzzle in memory when the browser blocks storage.
+    }
+    return generated;
+  }
+
+  function startGame(isDaily) {
+    if (isDaily) {
+      $('#difficulty').value = 'medium';
+      $('#game-mode').value = 'standard';
+    }
     state.difficulty = $('#difficulty').value;
     state.mode = $('#game-mode').value;
+    state.isDaily = isDaily;
+    state.dailyDate = isDaily ? Achievements.localDateKey() : null;
+    state.usedHint = false;
+    $('#puzzle-eyebrow').textContent = isDaily ? `DAILY PUZZLE · ${state.dailyDate}` : 'DAILY PUZZLE · NO. 09';
     boardEl.setAttribute('aria-label', state.mode === 'diagonal'
       ? 'X-Sudoku 9 乘 9 棋盤，兩條大對角線上的數字也不可重複'
       : state.mode === 'jigsaw'
         ? '鋸齒數獨 9 乘 9 棋盤，含 9 個各有 9 格的連通異形區域'
-        : '數獨 9 乘 9 棋盤');
+        : isDaily ? '每日一題標準數獨 9 乘 9 棋盤' : '數獨 9 乘 9 棋盤');
+    const difficulty = state.difficulty;
+    const mode = state.mode;
+    const dailyDate = state.dailyDate;
     $('#new-game-button').disabled = true;
     $('#new-game-button').innerHTML = '<span aria-hidden="true">…</span> 準備中';
-    setMessage('正在準備一盤全新的數獨…');
+    $('#daily-button').disabled = true;
+    $('#difficulty').disabled = true;
+    $('#game-mode').disabled = true;
+    setMessage(isDaily ? '正在準備今日的每日一題…' : '正在準備一盤全新的數獨…');
     window.setTimeout(() => {
-      const generated = generatePuzzle(state.difficulty, state.mode);
+      let generated;
+      try {
+        generated = isDaily ? dailyPuzzleFor(dailyDate) : generatePuzzle(difficulty, mode);
+      } catch (error) {
+        console.error('Unable to generate Sudoku puzzle:', error);
+        setMessage('這盤題目暫時無法準備，請再試一次。', 'error');
+        $('#new-game-button').disabled = false;
+        $('#new-game-button').innerHTML = '<span aria-hidden="true">＋</span> 新局';
+        $('#daily-button').disabled = false;
+        $('#difficulty').disabled = false;
+        $('#game-mode').disabled = false;
+        return;
+      }
       state.puzzle = generated.puzzle.flat();
       state.solution = generated.solution.flat();
       state.regions = generated.regions || null;
@@ -341,16 +423,30 @@
       state.paused = false;
       state.failed = false;
       state.completed = false;
+      state.usedHint = false;
       state.notesMode = false;
       state.history = [];
       state.selected = state.puzzle.findIndex((value) => value === 0);
       const clueText = generated.clueCount;
-      setMessage(`${modeLabels[state.mode]} · ${difficultyLabels[state.difficulty]}難度已就緒 · ${clueText} 個提示數字。`);
+      setMessage(isDaily
+        ? `每日一題 · ${dailyDate} · 中等難度已就緒 · ${clueText} 個提示數字。`
+        : `${modeLabels[state.mode]} · ${difficultyLabels[state.difficulty]}難度已就緒 · ${clueText} 個提示數字。`);
       updateTimer();
       renderBoard();
       $('#new-game-button').disabled = false;
       $('#new-game-button').innerHTML = '<span aria-hidden="true">＋</span> 新局';
+      $('#daily-button').disabled = false;
+      $('#difficulty').disabled = false;
+      $('#game-mode').disabled = false;
     }, 30);
+  }
+
+  function newGame() {
+    startGame(false);
+  }
+
+  function startDailyChallenge() {
+    startGame(true);
   }
 
   function togglePause() {
@@ -375,6 +471,88 @@
     else $('#help-button').focus();
   }
 
+  function refreshAchievementUi() {
+    const unlockedIds = new Set(achievementProgress.unlocked);
+    const unlockedCount = unlockedIds.size;
+    $('#achievement-count').textContent = `${unlockedCount}/${Achievements.BADGES.length}`;
+    $('#achievement-summary').textContent = `已解鎖 ${unlockedCount} / ${Achievements.BADGES.length} 枚徽章。繼續解題，收藏你的每一步。`;
+    const list = $('#achievement-list');
+    list.replaceChildren();
+
+    Achievements.BADGES.forEach((badge) => {
+      const unlocked = unlockedIds.has(badge.id);
+      const card = document.createElement('article');
+      card.className = `achievement-card ${unlocked ? 'is-unlocked' : 'is-locked'}`;
+      card.setAttribute('aria-label', `${badge.title}：${unlocked ? '已解鎖' : '尚未解鎖'}。${badge.description}`);
+
+      const medallion = document.createElement('span');
+      medallion.className = 'achievement-medallion';
+      medallion.setAttribute('aria-hidden', 'true');
+      medallion.textContent = badge.icon;
+
+      const copy = document.createElement('div');
+      copy.className = 'achievement-copy';
+      const title = document.createElement('h3');
+      title.textContent = badge.title;
+      const description = document.createElement('p');
+      description.textContent = badge.description;
+      const progress = document.createElement('small');
+      progress.textContent = unlocked ? '已解鎖' : Achievements.progressLabel(badge.id, achievementProgress);
+      copy.append(title, description, progress);
+
+      const status = document.createElement('span');
+      status.className = unlocked ? 'achievement-check' : 'achievement-lock';
+      status.setAttribute('aria-hidden', 'true');
+      status.textContent = unlocked ? '✓' : '🔒';
+      card.append(medallion, copy, status);
+      list.appendChild(card);
+    });
+  }
+
+  function showNextAchievementToast() {
+    const badge = achievementToastQueue.shift();
+    const toast = $('#achievement-toast');
+    if (!badge) {
+      toast.hidden = true;
+      toast.classList.remove('is-visible', 'is-leaving');
+      achievementToastTimer = null;
+      return;
+    }
+
+    $('#achievement-toast-title').textContent = `成果解鎖：${badge.title}！`;
+    toast.hidden = false;
+    toast.classList.remove('is-leaving');
+    toast.classList.remove('is-visible');
+    void toast.offsetWidth;
+    toast.classList.add('is-visible');
+    achievementToastTimer = window.setTimeout(() => {
+      toast.classList.remove('is-visible');
+      toast.classList.add('is-leaving');
+      achievementToastTimer = window.setTimeout(() => {
+        toast.classList.remove('is-leaving');
+        toast.hidden = true;
+        showNextAchievementToast();
+      }, 260);
+    }, 2700);
+  }
+
+  function queueAchievementToasts(badges) {
+    if (!badges || badges.length === 0) return;
+    achievementToastQueue.push(...badges);
+    if (achievementToastTimer === null) showNextAchievementToast();
+  }
+
+  function toggleAchievements(open) {
+    const dialog = $('#achievements-dialog');
+    dialog.hidden = !open;
+    if (open) {
+      refreshAchievementUi();
+      $('#close-achievements-button').focus();
+    } else {
+      $('#achievements-button').focus();
+    }
+  }
+
   for (let index = 0; index < 81; index += 1) makeCell(index);
 
   boardEl.addEventListener('click', (event) => {
@@ -390,6 +568,7 @@
   $('#notes-button').addEventListener('click', toggleNotes);
   $('#restart-button').addEventListener('click', restartGame);
   $('#new-game-button').addEventListener('click', newGame);
+  $('#daily-button').addEventListener('click', startDailyChallenge);
   $('#difficulty').addEventListener('change', newGame);
   $('#game-mode').addEventListener('change', newGame);
   $('#pause-button').addEventListener('click', togglePause);
@@ -408,10 +587,20 @@
   $('#help-dialog').addEventListener('click', (event) => {
     if (event.target === $('#help-dialog')) toggleDialog(false);
   });
+  $('#achievements-button').addEventListener('click', () => toggleAchievements(true));
+  $('#close-achievements-button').addEventListener('click', () => toggleAchievements(false));
+  $('#close-achievements-done').addEventListener('click', () => toggleAchievements(false));
+  $('#achievements-dialog').addEventListener('click', (event) => {
+    if (event.target === $('#achievements-dialog')) toggleAchievements(false);
+  });
 
   document.addEventListener('keydown', (event) => {
     if (!$('#help-dialog').hidden) {
       if (event.key === 'Escape') toggleDialog(false);
+      return;
+    }
+    if (!$('#achievements-dialog').hidden) {
+      if (event.key === 'Escape') toggleAchievements(false);
       return;
     }
     if (event.target.matches('input, select, textarea, [contenteditable="true"]')) return;
@@ -433,6 +622,7 @@
     if (event.key.toLowerCase() === 'h' && !event.repeat) giveHint();
   });
 
+  refreshAchievementUi();
   window.setInterval(updateTimer, 250);
   newGame();
 })();
