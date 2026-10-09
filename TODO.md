@@ -9,4 +9,4 @@
 - [x] **鋸齒模式選擇與三模式切換**：在選單中新增【鋸齒數獨（Jigsaw Sudoku）】選項，讓玩家可在「標準」、「X-Sudoku」與「鋸齒數獨」之間切換。
 - [x] **Jigsaw 區域、規則與唯一解題目**：不使用標準 3x3 宮格，而是將 81 格連通分割成 9 個各含 9 格的任意形狀區域（Polyominoes / Nonominoes）；確保在每一行、每一列以及每一個「非規則形狀區域」內，數字 1-9 均不重複；預先備妥或動態生成符合鋸齒區域規則且具有「唯一解」的數獨題目。
 - [x] **異形區域邊界與互動高亮**：使用較粗的邊框（Thick Grid Borders）或不同顏色背景，清楚勾勒出 9 個異形區域的邊界；當玩家點擊某個格子時，同屬於該異形區域的其他格子需同步高亮顯示，便於玩家思考。
-- [ ] **GitHub 推送與 Cloudflare Pages 自動更新**：將更新後的程式碼 Commit & Push 到 GitHub 儲存庫，觸發 Cloudflare Pages（sudoku-game-auto）自動部署更新。
+- [x] **GitHub 推送與 Cloudflare Pages 自動更新**：將更新後的程式碼 Commit & Push 到 GitHub 儲存庫，觸發 Cloudflare Pages（sudoku-game-auto）自動部署更新。
